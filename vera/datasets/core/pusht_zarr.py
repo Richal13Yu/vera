@@ -25,6 +25,36 @@ from typing import Optional, Sequence
 import numpy as np
 
 
+def _patch_zarr_v2_codec_bug() -> None:
+    """Work around a bug in zarr's pre-3.0 pre-releases (the only zarr>=3.0 builds
+    pip-installable on Python 3.10 — every stable 3.x wheel requires Python>=3.11):
+    the V2 Blosc-decode path calls ``numcodecs.get_codec(self.compressor)`` where
+    ``self.compressor`` is already an instantiated codec object, not a config dict,
+    so ``numcodecs.registry.get_codec`` fails with
+    ``TypeError: 'Blosc' object is not iterable``. numcodecs version is not the
+    cause (reproduces on 0.12.1 and 0.13.1 alike) — pass already-instantiated
+    codecs through unchanged. No-op once zarr resolves the config dict correctly
+    (upstream fix / Python 3.11 stable zarr), so this is safe to leave in place."""
+    try:
+        import numcodecs.registry as _reg
+    except ImportError:
+        return
+    _orig = _reg.get_codec
+    if getattr(_orig, "_pusht_zarr_v2_patch", False):
+        return
+
+    def _patched(config):
+        if not isinstance(config, dict):
+            return config
+        return _orig(config)
+
+    _patched._pusht_zarr_v2_patch = True
+    _reg.get_codec = _patched
+    import numcodecs
+
+    numcodecs.get_codec = _patched
+
+
 class PushtZarr:
     """Opened-zarr view exposing the arrays + precomputed stats the PushT action model
     reads. Attributes mirror the synthetic ``_Zarr`` fixture in the action-model parity
@@ -42,7 +72,12 @@ class PushtZarr:
     ):
         import zarr
 
-        self._z = zarr.open(str(zarr_root), mode="r")
+        _patch_zarr_v2_codec_bug()
+        # zarr.open()'s format auto-detection misreads this v2-format directory
+        # store as a single array (raising FileNotFoundError) on the pre-3.0
+        # pre-releases described above; open_group() is unambiguously correct
+        # regardless — every access below indexes self._z as a group.
+        self._z = zarr.open_group(str(zarr_root), mode="r")
         self.joint_indices = list(joint_indices)
         ji = np.asarray(self.joint_indices, dtype=np.int64)
 

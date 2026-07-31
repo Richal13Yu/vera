@@ -59,6 +59,11 @@ SMOOTHING = float(os.environ.get("VERA_PUSHT_SMOOTHING", "0.0"))
 ACTION_CHUNK_HORIZON = int(os.environ.get("VERA_PUSHT_ACTION_CHUNK_HORIZON", "3"))
 N_ACTION_STEPS = int(os.environ.get("VERA_PUSHT_N_ACTION_STEPS", "2"))
 DEFAULT_PLANNER_STEPS = int(os.environ.get("VERA_PUSHT_PLANNER_STEPS", "100"))
+# PlannerCfg defaults to "alltracker"; the checkpoint's own documented recipe
+# (vera-ckpts/pusht-dfot/README.md) uses "megaflow" — expose it the same way
+# as every other PushT knob so the high-SR recipe is reproducible without a
+# code edit. See docs/PUSHT_REPRODUCTION.md.
+TRACKER_BACKEND = os.environ.get("VERA_PUSHT_TRACKER_BACKEND", "alltracker")
 
 
 def build_policy(
@@ -91,14 +96,16 @@ def build_policy(
 
     logging.info(
         "PUSHT policy: DFoT planner=%s (steps=%d) + Jacobian IDM=%s | "
-        "scale=%.1f action_scale=%.1f lam=%.1f H=%d exec=%d",
+        "scale=%.1f action_scale=%.1f lam=%.1f H=%d exec=%d tracker=%s",
         planner_ckpt, steps, dynamics_ckpt,
         MOTION_PLAN_SCALE, ACTION_SCALE, LAM, ACTION_CHUNK_HORIZON, N_ACTION_STEPS,
+        TRACKER_BACKEND,
     )
 
     planner_cfg = PlannerCfg(
         ckpt_path=planner_ckpt,
         diffusion_sampling_timesteps=steps,
+        tracker_backend=TRACKER_BACKEND,
     )
     dynamics_cfg = DynamicsCfg(ckpt_path=dynamics_ckpt)
     controller_cfg = ControllerCfg(
