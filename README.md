@@ -35,6 +35,12 @@ translate that dream into actions:
 <a id="news"></a>
 ## 🔥 News
 
+**Aug 2026 — PushT training data on HF.** Both packed PushT training sets now ship in the
+[model repo](https://huggingface.co/sizhe-lester-li/VERA): `pusht-packed/` (206 teleop episodes,
+~1.9 GB) and `pusht-noise-packed/` (18,685 random-exploration episodes, ~61 GB) — JPEG frames +
+MegaFlow optical flow. Setup: [TRAINING.md](TRAINING.md) ("Get the training data (PushT)");
+regeneration: `scripts/data/pack_pusht.py` + [docs/DATA_GENERATION.md](docs/DATA_GENERATION.md).
+
 **Jul 12, 2026 — DROID: language-conditioned video generation (no robot required).**
 If you want to see the planner itself at work before setting up any simulator, start here: the
 notebook continues the same real context frames under different language prompts, and the
@@ -63,7 +69,7 @@ export VERA_WAN14B_CKPT_ROOT=/path/to/Wan2.1-I2V-14B-480P   # frozen Wan2.1 base
 
 ## 🗺️ Release roadmap
 
-_Last updated: **Jul 12, 2026**._
+_Last updated: **Aug 12, 2026**._
 
 | Wave | Embodiments | Code | Checkpoints | Status |
 |------|-------------|:----:|:-----------:|:------:|
@@ -156,7 +162,9 @@ python -m vera.server.start_vera_server --embodiment pusht --port 8820 --vis-por
   the rollout + the composite policy-vis;
 - checkpoint paths come from the `VERA_PUSHT_*` env vars (see `vera/server/start_server_pusht.py`);
 - the server plans 3 future frames per replan and executes 2 of them (`VERA_PUSHT_ACTION_CHUNK_HORIZON=3`,
-  `VERA_PUSHT_N_ACTION_STEPS=2`, both env-overridable).
+  `VERA_PUSHT_N_ACTION_STEPS=2`, both env-overridable);
+- reproducing the paper's reported success rate (exact state list, recipe, verified numbers,
+  video viewer): see [`docs/PUSHT_REPRODUCTION.md`](docs/PUSHT_REPRODUCTION.md).
 
 ### MimicGen two-block stacking (WAN planner)
 
@@ -212,7 +220,9 @@ frozen upstream pieces are pulled from their original homes.
 |---|---|---|
 | **MimicGen** | `mimicgen-wan-1.3b/` | specialist WAN planner (DiT-only bf16, ~2.8 GB) + `flow_decoder.ckpt` + `algo_config.yaml` |
 | **PushT** | `pusht-dfot/` | DFoT flow planner (~39 MB) + `run_config.yaml` |
-| | `pusht-idm/` | PushT Jacobian IDM (~232 MB) + `config.yaml` |
+| | `pusht-idm/` | PushT Jacobian IDM (~232 MB) + `config.yaml` — reproduction: [`docs/PUSHT_REPRODUCTION.md`](docs/PUSHT_REPRODUCTION.md) |
+| | `pusht-packed/` | **packed PushT training set** (206 episodes, ~1.9 GB) — [TRAINING.md](TRAINING.md) |
+| | `pusht-noise-packed/` | **packed PushT noise set** (18,685 episodes, ~61 GB) — [TRAINING.md](TRAINING.md) |
 | **DROID** | `wan-droid-14b/` | DROID WAN planner (DiT-only bf16, ~31 GB) + `algo_config.yaml` |
 | | `droid-demo-clips/` | sample multi-view robot clips for the generation walkthrough (~100 MB) |
 | **Upstream** | `Wan-AI/Wan2.1-T2V-1.3B`, `Wan-AI/Wan2.1-I2V-14B-480P`, `facebook/VGGT-1B` | WAN bases + IDM backbone (not re-hosted) |
@@ -228,7 +238,7 @@ hf download sizhe-lester-li/VERA --local-dir ./vera-ckpts \
 hf download sizhe-lester-li/VERA --local-dir ./vera-ckpts
 ```
 
-The Wave-1 download is **~15 GB (11.3 GB of it the VGGT-based MimicGen IDM)**; the full repo is **~73 GB** (the 33 GB OMNI planner and the 31 GB DROID planner dominate).
+The Wave-1 download is **~15 GB (11.3 GB of it the VGGT-based MimicGen IDM)**; the full repo is **~136 GB** (the 61 GB PushT noise pack, the 33 GB OMNI planner and the 31 GB DROID planner dominate).
 Then point the server/notebook at the downloaded paths (`--algo-config`, `VERA_PUSHT_*` / `VERA_WAN_CKPT_ROOT`).
 
 **OMNI training data (Wave 2):** the cross-embodiment OMNI WAN planner is trained on a weighted mixture of

@@ -15,7 +15,7 @@ venv/
 *.pth.tmp
 
 # Data / artifacts (never commit)
-data/
+/data/
 outputs/
 logs/
 *.log

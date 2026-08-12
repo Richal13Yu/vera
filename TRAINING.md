@@ -43,6 +43,42 @@ The IDM dataset yields views-separate `rgb [T,V,3,H,W]`, `flow`, and the per-emb
 `vera/datasets/core/actions.py`). The Jacobian IDM regresses the local action-to-flow map and inverts it at
 inference — data-efficient and scalable to high-DoF action spaces.
 
+### Get the training data (PushT)
+
+The packed PushT training set (206 episodes, ~1.9 GB — 504×504 JPEG frames + MegaFlow optical flow,
+qint8-quantized) ships in the same HF repo; the config expects it at
+`$VERA_DATA_PREFIX/datasets/jacobian/pusht_packed`:
+
+```bash
+hf download sizhe-lester-li/VERA --include "pusht-packed/*" --local-dir ./vera-ckpts
+mkdir -p $VERA_DATA_PREFIX/datasets/jacobian
+ln -s "$(pwd)/vera-ckpts/pusht-packed" $VERA_DATA_PREFIX/datasets/jacobian/pusht_packed
+```
+
+Actions are read at train time from the original PushT replay buffer (not re-hosted — the same
+`pusht_cchi_v7_replay.zarr` download as in the [README install section](README.md#install)), so point
+`dataset.pusht_zarr_root` at its parent dir:
+
+```bash
+python -m vera.main --config-name=config_pusht_vggt_fusion_jacobian \
+    dataset.pusht_zarr_root=/path/to/pusht
+```
+
+Also available: the large **PushT noise pack** (`pusht-noise-packed/`, 18,685 random-exploration
+episodes, ~61 GB) used for IDM pretraining / data-efficiency ablations. Same format, expected at
+`$VERA_DATA_PREFIX/datasets/jacobian/pusht_noise_packed`; its actions are **self-contained** (state
+deltas from the in-NPZ `traj_state` — no zarr needed), wired up by
+`vera/configurations/dataset/pusht_noise_packed.yaml`:
+
+```bash
+hf download sizhe-lester-li/VERA --include "pusht-noise-packed/*" --local-dir ./vera-ckpts   # ~61 GB
+ln -s "$(pwd)/vera-ckpts/pusht-noise-packed" $VERA_DATA_PREFIX/datasets/jacobian/pusht_noise_packed
+```
+
+To regenerate either pack from scratch (or extend it), see `scripts/data/pack_pusht.py` and
+[docs/DATA_GENERATION.md](docs/DATA_GENERATION.md) — source-data provenance, exact commands,
+MegaFlow install, and GPU requirements for both byte sets.
+
 ## Stage 2 — Video planner (WAN / OMNI)
 
 ```bash
