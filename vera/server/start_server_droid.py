@@ -30,6 +30,7 @@ To connect from nora (the DROID machine):
 
 import gc as _gc
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,16 @@ DEFAULT_FLOW_PLANNER_DATA_ROOT = Path(
 DYNAMICS_ENTITY = "your-wandb-entity"
 DYNAMICS_PROJECT = "jacobian-learning"
 DEFAULT_DYNAMICS_RUN_ID = "7wohna95"
+
+# Local IDM checkpoint hook (mirrors start_server_mimicgen): VERA_DROID_DYNAMICS_CKPT
+# points at a downloaded model.ckpt with a config.yaml sidecar next to it — exactly
+# the hosted idm-droid/ bundle layout. If the path exists we load it directly and
+# skip wandb resolution entirely (needed on machines without wandb access).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DYNAMICS_CKPT = os.environ.get(
+    "VERA_DROID_DYNAMICS_CKPT",
+    str(_REPO_ROOT / "vera-ckpts" / "idm-droid" / "model.ckpt"),
+)
 
 # ── Runtime defaults ────────────────────────────────────────────────
 DIFFUSION_SAMPLING_TIMESTEPS = 40
@@ -289,15 +300,24 @@ def build_policy(
         megaflow_num_reg_refine=megaflow_num_reg_refine,
     )
 
-    dynamics_model_cfg = DynamicsCfg(
-        ckpt=ModelCheckpoint(
-            entity=DYNAMICS_ENTITY,
-            project=DYNAMICS_PROJECT,
-            run_id=dynamics_run_id,
-            option="latest",
-            force_redownload=False,
-        ),
-    )
+    # prefer a local checkpoint (env var / release layout) over wandb resolution
+    if Path(DEFAULT_DYNAMICS_CKPT).exists():
+        logging.info("DROID IDM: local ckpt %s", DEFAULT_DYNAMICS_CKPT)
+        dynamics_model_cfg = DynamicsCfg(ckpt_path=DEFAULT_DYNAMICS_CKPT)
+    else:
+        logging.info(
+            "DROID IDM: wandb run %s/%s/%s",
+            DYNAMICS_ENTITY, DYNAMICS_PROJECT, dynamics_run_id,
+        )
+        dynamics_model_cfg = DynamicsCfg(
+            ckpt=ModelCheckpoint(
+                entity=DYNAMICS_ENTITY,
+                project=DYNAMICS_PROJECT,
+                run_id=dynamics_run_id,
+                option="latest",
+                force_redownload=False,
+            ),
+        )
 
     controller_cfg = ControllerCfg(
         lam=0.0,

@@ -50,10 +50,14 @@ qint8-quantized) ships in the same HF repo; the config expects it at
 `$VERA_DATA_PREFIX/datasets/jacobian/pusht_packed`:
 
 ```bash
+pip install -U huggingface_hub   # 1.x REQUIRED: hub <=0.36 truncates this repo's file
+                                 # listing and the --include below matches 0 files
 hf download sizhe-lester-li/VERA --include "pusht-packed/*" --local-dir ./vera-ckpts
 mkdir -p $VERA_DATA_PREFIX/datasets/jacobian
 ln -s "$(pwd)/vera-ckpts/pusht-packed" $VERA_DATA_PREFIX/datasets/jacobian/pusht_packed
 ```
+
+> If the download prints `Fetching 0 files`, your `huggingface_hub` is too old — upgrade and rerun.
 
 Actions are read at train time from the original PushT replay buffer (not re-hosted — the same
 `pusht_cchi_v7_replay.zarr` download as in the [README install section](README.md#install)), so point
