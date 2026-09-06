@@ -1,4 +1,4 @@
-<h1 align="center">VERA — Turning Video Models into Generalist Robot Policies</h1>
+<h1 align="center">Turning Video Models into Generalist Robot Policies</h1>
 
 <p align="center">
   Sizhe Lester Li<sup>*</sup>,
