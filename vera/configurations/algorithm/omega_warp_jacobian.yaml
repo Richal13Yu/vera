@@ -1,0 +1,15 @@
+defaults:
+  - image_jacobian
+  - _self_
+
+name: omega_warp_jacobian
+supervision: flow
+view_flow_balance_mode: none
+view_balanced_flow_loss: true
+warp_teacher:
+  config_path: ${oc.env:VERA_WARP_CONFIG,null}
+  backbone_checkpoint: ${oc.env:VERA_OMEGA_CHECKPOINT,null}
+  head_checkpoint: ${oc.env:VERA_WARP_CHECKPOINT,null}
+  precision: bf16
+  pair_batch_size: 1
+  certainty_threshold: 0.5

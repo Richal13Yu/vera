@@ -16,7 +16,8 @@ from .runtime_motion_tracks import (
 def tracker_backend_from_cfg(cfg: Any) -> str:
     backend = getattr(cfg, "tracker_backend", None)
     if backend is None:
-        return "alltracker"
+        # WanAllTrackerPipeline passes MotionTrackConfig, whose field is backend.
+        backend = getattr(cfg, "backend", "alltracker")
     return str(backend)
 
 

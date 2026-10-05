@@ -27,6 +27,7 @@ from .inverse_dynamics.dpt_vggt_pooled_action import (
     DptVggtPooledActionCfg,
 )
 from .jacobian.image_jacobian import ImageJacobian, ImageJacobianCfg
+from .jacobian.omega_warp_jacobian import OmegaWarpJacobian, OmegaWarpJacobianCfg
 from .jacobian.latent_jacobian import LatentJacobian, LatentJacobianCfg
 from .jacobian.dino_feature_jacobian import DinoFeatureJacobian, DinoFeatureJacobianCfg
 from .jacobian.dino_chunk_jacobian import DinoChunkJacobian, DinoChunkJacobianCfg

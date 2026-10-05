@@ -1,0 +1,59 @@
+defaults:
+  - config_jacobian_mimicgen_vggt_v3_taskbalanced
+  - override /algorithm: omega_warp_jacobian
+  - override /algorithm/model: omega_warp_jacobian
+  - _self_
+
+name: mimicgen-omega-warp
+
+experiment:
+  training:
+    batch_size: 1
+    data:
+      num_workers: 2
+      prefetch_factor: 2
+
+dataset: &warp_dataset
+  load_rgb_next: true
+  load_flow: false
+  load_motion_tracks: false
+  # Warp labels are produced at the resized RGB resolution, in pixels.
+  flow_normalization_mode: scale
+  flow_normalization_space: resized
+  oflow_scale: 0.1
+  oflow_abs_scale: null
+  oflow_percentile: null
+  # Native teacher predictions cover the whole image (no packed-flow zeroing).
+  eye_in_hand_mask_bottom_px: null
+
+validation_datasets:
+  coffee_d0: *warp_dataset
+  coffee_d1: *warp_dataset
+  square_d0: *warp_dataset
+  square_d1: *warp_dataset
+  square_d2: *warp_dataset
+  stack_d0: *warp_dataset
+  stack_d1: *warp_dataset
+  stack_three_d0: *warp_dataset
+  stack_three_d1: *warp_dataset
+
+algorithm:
+  view_flow_balance_mode: none
+  view_balanced_flow_loss: true
+  # Start with the correspondence loss; add regularizers after inspecting labels.
+  inverse_action_weight: 0.0
+  flow_gradient_weight: 0.0
+  jacobian_tv_weight: 0.0
+  predict_uncertainty: false
+  pmap_uncertainty_weight: 0.0
+  model:
+    name: vggt_omega_jacobian
+    pretrained_model_id: null
+    checkpoint_path: ${oc.env:VERA_OMEGA_CHECKPOINT,null}
+    # Train the student backbone; the separate Omega-Warp teacher remains frozen.
+    freeze_aggregator: false
+    predict_uncertainty: false
+
+wandb:
+  group: mimicgen-omega-warp
+  tags: [mimicgen, omega, warp-teacher, jacobian]

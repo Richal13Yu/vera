@@ -1,0 +1,30 @@
+# Official MimicGen source RGB converted with scripts/data/pack_mimicgen.py.
+# Recorded images are 84x84; this is not the unreleased MegaFlow pack.
+defaults:
+  - config_jacobian_mimicgen_omega_warp
+  - _self_
+
+name: mimicgen-omega-warp-official-rgb
+
+dataset:
+  root: ${oc.env:VERA_MIMICGEN_ROOT,${oc.env:VERA_DATA_PREFIX,./data}/datasets/jacobian/mimicgen_official_rgb_warp}
+
+validation_datasets:
+  coffee_d0: {root: '${dataset.root}'}
+  coffee_d1: {root: '${dataset.root}'}
+  square_d0: {root: '${dataset.root}'}
+  square_d1: {root: '${dataset.root}'}
+  square_d2: {root: '${dataset.root}'}
+  stack_d0: {root: '${dataset.root}'}
+  stack_d1: {root: '${dataset.root}'}
+  stack_three_d0: {root: '${dataset.root}'}
+  stack_three_d1: {root: '${dataset.root}'}
+
+experiment:
+  training:
+    precision: bf16-mixed
+
+wandb:
+  mode: disabled
+  group: mimicgen-omega-warp-official-rgb
+  tags: [mimicgen, omega, warp-teacher, jacobian, official-rgb-84]

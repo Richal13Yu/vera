@@ -31,3 +31,7 @@ from .transformer_jacobian_field import (
 )
 from .unet_jacobian_field import UnetJacobianField, UnetJacobianFieldCfg
 from .vggt_jacobian_field import VggtJacobianField, VggtJacobianFieldCfg
+from .vggt_omega_jacobian_field import (
+    VggtOmegaJacobianField,
+    VggtOmegaJacobianFieldCfg,
+)

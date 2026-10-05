@@ -42,6 +42,8 @@ class DatasetConfig:
     pad_views_to: Optional[int] = None
     pad_position: str = "right"
     load_flow: bool = False
+    # IDM teacher input at the same transition endpoint used to derive du.
+    load_rgb_next: bool = False
 
     # --- video-model (WAN/OMNI) extras ---
     # Black-pad the post-tile canvas width to this (combined_4env: 576). None = no pad.
@@ -129,6 +131,15 @@ class UnifiedDataset(_TorchDataset):
         cfg: DatasetConfig,
         seed: int = 0,
     ):
+        if cfg.derive_action and cfg.load_rgb_next:
+            if cfg.use_time_aware_delta:
+                raise ValueError(
+                    "load_rgb_next currently requires fixed-step actions; "
+                    "use_time_aware_delta can select a different target frame than "
+                    "t + linearize. Disable use_time_aware_delta for warp supervision."
+                )
+            if int(cfg.linearize) < 1:
+                raise ValueError("load_rgb_next requires linearize >= 1.")
         self.source = source
         self.view_loader = view_loader
         self.cfg = cfg
@@ -344,6 +355,18 @@ class UnifiedDataset(_TorchDataset):
                 )
                 du = self._derive_du(episode, t_src)
                 out: Dict[str, Any] = {"rgb": rgb, "du": du}
+                if self.cfg.load_rgb_next:
+                    # Keep target frames separate from the student's current-state RGB.
+                    # _sample_window reserves the final linearize frames for this pair.
+                    rgb_next_views = self.view_loader.load_rgb(
+                        episode, t_src + int(self.cfg.linearize)
+                    )
+                    out["rgb_next"] = apply_layout(
+                        rgb_next_views,
+                        layout=self.cfg.layout,
+                        pad_views_to=self.cfg.pad_views_to,
+                        pad_position=self.cfg.pad_position,
+                    )
                 if self.cfg.load_flow:
                     flow_views = self.view_loader.load_flow(episode, t_src)
                     if flow_views is not None:

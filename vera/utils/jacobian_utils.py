@@ -511,7 +511,8 @@ def visualize_jacobian(
 
     jac_vis = rearrange(jac_vis, "cmd rgb h w -> cmd h w rgb")
     jac_vis = (255 * jac_vis).clip(0, 255).to(torch.uint8).cpu().numpy()
-    flow_vis = flow_vis.cpu().numpy()
+    # NumPy cannot represent BF16 outputs from mixed-precision validation.
+    flow_vis = flow_vis.detach().float().cpu().numpy()
 
     # Add arrows
     for i in range(num_cmd):
@@ -626,6 +627,6 @@ def draw_per_channel_jacobian_pastel(jacobian, robot_name):
 def draw_per_channel_optical_flow(jacobian):
     """Compute diag du -> optical_flow per command dim."""
     num_cmd = jacobian.shape[-4]
-    diag_cmds = torch.eye(num_cmd, device=jacobian.device)
+    diag_cmds = torch.eye(num_cmd, device=jacobian.device, dtype=jacobian.dtype)
     flow = einsum(jacobian, diag_cmds, "b cmd s h w, n cmd -> b n s h w")
     return rearrange(flow, "b n s h w -> b n h w s")

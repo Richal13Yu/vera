@@ -8,6 +8,7 @@ from .data_modules.utils import _data_module_cls
 class JacobianLearningExperiment(BaseLightningExperiment):
     compatible_algorithms = {
         "image_jacobian",
+        "omega_warp_jacobian",
         "latent_jacobian",
         "dino_feature_jacobian",
         "dino_chunk_jacobian",

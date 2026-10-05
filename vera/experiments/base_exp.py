@@ -347,11 +347,22 @@ class BaseLightningExperiment(BaseExperiment):
         # if self.debug:
         #     self.logger.watch(self.algo, log="all")
 
-        trainer.validate(
+        results = trainer.validate(
             self.algo,
             datamodule=self.data_module,
             ckpt_path=self.ckpt_path,
         )
+        # Preserve standalone validation metrics even without an external logger.
+        if trainer.is_global_zero:
+            output_path = self._get_output_dir() / "validation_results.json"
+            output_path.write_text(json.dumps({
+                "checkpoint": str(self.ckpt_path) if self.ckpt_path else None,
+                "dataloader_names": getattr(self.data_module, "validation_dataloader_names", []),
+                "limit_val_batches": self.cfg.validation.limit_batch,
+                "precision": self.cfg.validation.precision,
+                "results": results,
+            }, indent=2, allow_nan=False) + "\n")
+            rank_zero_print(cyan("Validation results saved to:"), output_path)
 
     def test(self) -> None:
         """

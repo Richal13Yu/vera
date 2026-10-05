@@ -131,15 +131,15 @@ class CoTrackerInference:
             visibility = pred_visibility
             if visibility.ndim == 4 and visibility.shape[-1] == 1:
                 visibility = visibility[..., 0]
-            visibility = visibility.detach().cpu().float()
+            visibility = visibility.detach().cpu() > 0.5
             pred_tracks_cpu = pred_tracks.detach().cpu().float()
             for batch_idx in range(pixel_video.shape[0]):
                 xy0 = pred_tracks_cpu[batch_idx, 0].numpy()
                 colors = _get_2d_colors(xy0, image_size[0], image_size[1])
                 vis_np = draw_pts_gpu(
                     pixel_video[batch_idx],
-                    pred_tracks_cpu[batch_idx],
-                    visibility[batch_idx],
+                    pred_tracks_cpu[batch_idx].to(self.device),
+                    visibility[batch_idx].to(self.device),
                     colors,
                     rate=2,
                     bkg_opacity=0.0,

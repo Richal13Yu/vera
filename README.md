@@ -229,6 +229,152 @@ MimicGen + DROID (native fps/aspect, black-padded to a 576-wide multiview canvas
 its own DFoT planner. The 5-environment mixture config ships in
 `vera/configurations/config_wan_combined_5env.yaml`.
 
+<a id="omega-warp-training"></a>
+
+### Omega-Warp Jacobian: data preparation and multi-GPU training
+
+This fork trains the **VGGT-Omega student backbone and Jacobian decoder**
+(`algorithm.model.freeze_aggregator=false`). The separate **Omega-Warp teacher,
+including its backbone and warp head, stays frozen** and generates flow/confidence
+labels online. The student receives only current observations, not future images.
+See [the implementation and evaluation notes](docs/OMEGA_WARP_JACOBIAN.md).
+
+**1. Clone the pinned Omega dependency and install.** Run subsequent commands from
+this repository's root, using Python 3.11:
+
+```bash
+git clone --recurse-submodules https://github.com/Richal13Yu/vera.git
+cd vera
+# For an existing clone:
+git submodule update --init --recursive
+
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[idm,video]" -e ./vggt-omega-warp \
+  "numpy<2" "zarr>=3,<3.1" tomli-w pytest
+```
+
+The Omega submodule is pinned to `9bf088b2cbb84f359e30768631a4a39bae44091c`.
+Keep this version for the existing teacher checkpoint's source fingerprint.
+The NumPy/Zarr constraints reconcile Omega's `numpy<2` requirement with VERA.
+The root package pins its PyTorch version; use a CUDA runtime compatible with your GPU.
+
+**2. Download the nine official MimicGen source tasks (~15.9 GB).**
+
+```bash
+python scripts/data/download_mimicgen.py \
+  --revision 33016f8a62c02334f929f2913af8fdd2a8a129e1 \
+  --output-root data/mimicgen_raw --workers 3
+```
+
+Source: [`amandlek/mimicgen_datasets`](https://huggingface.co/datasets/amandlek/mimicgen_datasets),
+`core/`. Tasks: `coffee_d0`, `coffee_d1`, `square_d0`, `square_d1`, `square_d2`,
+`stack_d0`, `stack_d1`, `stack_three_d0`, `stack_three_d1` — **1,000 demonstrations
+each, 9,000 total**. The downloader resumes partial HTTP downloads, verifies each
+file's SHA-256 against the source manifest, and writes `DOWNLOAD_COMPLETE.json`.
+Re-running verifies and skips completed files. The command above uses the exact
+source revision of the existing experiments.
+
+**3. Convert RGB and robot trajectories (~11 GB additional disk space).**
+
+```bash
+python -m scripts.data.pack_mimicgen \
+  --source-root data/mimicgen_raw \
+  --output-root data/datasets/jacobian/mimicgen_official_rgb_warp \
+  --workers 3
+```
+
+The pack contains both recorded cameras (`agentview_image`, `robot0_eye_in_hand_image`)
+and end-effector/gripper observations; VERA derives its normalized actions from
+those observations. Source RGB is **84×84**, resized to **128×128** by the loader.
+The converter preserves the task/demo order, supports restarting, and writes the
+complete `index.json` after all selected tasks finish.
+
+This is **not** the author's `mimicgen_packed_v3_megaflow` preprocessing package.
+It contains no MegaFlow labels; Omega-Warp supplies labels during training.
+The original packed data was unavailable for these experiments. Budget space for
+both source and converted data, plus model weights and optimizer checkpoints.
+
+**4. Supply the Omega backbone and your trained Warp head.** These large files are
+not stored in Git. Copy `vggt_omega_1b_512.pt` and the supplied Warp `best.pt` to the
+new machine, then export their local paths:
+
+```bash
+export VERA_OMEGA_CHECKPOINT=/absolute/path/to/vggt_omega_1b_512.pt
+export WARP_SOURCE_CHECKPOINT=/absolute/path/to/best.pt
+
+python scripts/prepare_omega_warp_teacher.py "$WARP_SOURCE_CHECKPOINT" \
+  --backbone "$VERA_OMEGA_CHECKPOINT" \
+  --output-dir outputs/omega_warp_preflight
+
+export VERA_WARP_CHECKPOINT="$PWD/outputs/omega_warp_preflight/best_inference.pt"
+export VERA_WARP_CONFIG="$PWD/outputs/omega_warp_preflight/teacher.toml"
+export VERA_MIMICGEN_ROOT="$PWD/data/datasets/jacobian/mimicgen_official_rgb_warp"
+```
+
+Preparation checks the backbone SHA-256 against the Warp checkpoint, preserves
+every head tensor, and exports a weights-only inference file and matching TOML.
+The existing experiment's backbone SHA-256 is
+`c02da418b18bb01d0392598d3f6147366bcde1bb70fd08a5e3bf7925b0667934`.
+Re-export these environment variables in each training shell.
+
+**5. Check the setup, then launch on multiple GPUs.**
+
+```bash
+# Two-example pack and two training steps, using the unfrozen backbone.
+python -m scripts.data.pack_mimicgen --tasks stack_d0 --limit-per-task 2 \
+  --workers 1 --output-root outputs/omega_warp_preflight/pack_smoke
+CUDA_VISIBLE_DEVICES=0 bash scripts/train_mimicgen_omega_warp.sh smoke
+
+# Single-node, four-GPU DDP. Lightning launches one process per visible GPU.
+CUDA_VISIBLE_DEVICES=0,1,2,3 bash scripts/train_mimicgen_omega_warp.sh train
+```
+
+Use the launcher once; do not additionally wrap this command in `torchrun`.
+Each GPU has its own student, optimizer state, and frozen teacher; DDP does not
+combine GPU memory. Full-backbone training needs more memory per GPU than the
+historical frozen run. A real full-size multi-GPU run must be checked on the target
+machine; the unit tests alone do not establish its memory requirements.
+
+Defaults remain **batch size 1 per GPU**, 8 frames, two cameras, 128×128 RGB,
+BF16 mixed precision, AdamW learning rate **5e-5**, accumulation **1**, and at most
+**600,000 total optimizer steps**. Inverse-action, flow-gradient, and Jacobian-TV
+training weights remain zero. Four GPUs therefore give global batch size **4**;
+this changes the examples processed per step compared with the old single-GPU run.
+The only model-training switch changed from that run is unfreezing the student backbone.
+To reproduce its freezing behavior, append `algorithm.model.freeze_aggregator=true`.
+
+Runs save the Hydra config and checkpoints under `outputs/mimicgen_omega_warp/`.
+`VERA_PYTHON` can select another Python executable; otherwise the launcher uses
+`.venv/bin/python`. W&B is disabled by default. Validation retains the nine pinned
+MimicGen tasks every 1,000 steps; these episodes are also in the training pool,
+so this is not a held-out evaluation or a robot success-rate measurement.
+
+**Continue a full-backbone run** by copying its checkpoint and passing:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 bash scripts/train_mimicgen_omega_warp.sh train \
+  'load="/absolute/path/to/last.ckpt"'
+```
+
+For a checkpoint from the **older frozen-backbone run**, first copy that run's
+`.hydra/config.yaml` as well and migrate its optimizer parameter list:
+
+```bash
+python scripts/unfreeze_omega_checkpoint.py \
+  /absolute/path/to/frozen-last.ckpt /absolute/path/to/unfrozen-resume.ckpt \
+  --config /absolute/path/to/frozen-run/.hydra/config.yaml
+CUDA_VISIBLE_DEVICES=0,1,2,3 bash scripts/train_mimicgen_omega_warp.sh train \
+  'load="/absolute/path/to/unfrozen-resume.ckpt"'
+```
+
+Migration preserves student weights, decoder AdamW moments, learning rate, and
+training step, and initializes moments only for the newly unfrozen backbone.
+The Warp teacher remains separate and unchanged. Export the new machine's
+`VERA_*` paths before migration. A continued run stops at the configured **total**
+step limit, not 600,000 additional steps.
+
 ---
 
 ## 🗺️ Release roadmap

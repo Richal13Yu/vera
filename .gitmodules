@@ -1,0 +1,3 @@
+[submodule "vggt-omega-warp"]
+	path = vggt-omega-warp
+	url = https://github.com/Richal13Yu/vggt-omega-warp.git

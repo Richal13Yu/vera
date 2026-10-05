@@ -1,0 +1,22 @@
+# Omega is the trainable student encoder. Configure the warp teacher separately;
+# its source/target pair must not enter this model's simultaneous-camera axis.
+name: vggt_omega_jacobian
+command_dim: 7
+spatial_dim: 2
+image_size: ${dataset.resolution}
+# Local official Omega backbone/full-model weights, not the learned warp head.
+checkpoint_path: null
+pretrained_model_id: null
+strict_checkpoint_load: true
+low_memory_init: true
+freeze_aggregator: false
+aggregator_lr_multiplier: 1.0
+patch_size: 16
+embed_dim: 1024
+decoder_features: 256
+decoder_out_channels: [256, 512, 1024, 1024]
+decoder_intermediate_layer_idx: [4, 11, 17, 23]
+decoder_pos_embed: true
+decoder_init_std: null
+output_scale: 1.0
+predict_uncertainty: false

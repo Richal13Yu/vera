@@ -29,6 +29,9 @@ GPUs, DDP by default; `experiment.strategy=fsdp` for models too big to replicate
 
 ## Stage 1 — Jacobian IDM (per embodiment)
 
+Optional local Omega backbone + frozen Warp teacher integration:
+[Omega-Warp Jacobian setup and limitations](docs/OMEGA_WARP_JACOBIAN.md).
+
 | Environment | `--config-name` | dataset / model |
 |---|---|---|
 | **MimicGen** (Panda, 2 views) | `config_jacobian_mimicgen_vggt_v3_taskbalanced` | `mimicgen_packed_v3` / `image_jacobian` + VGGT |

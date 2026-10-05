@@ -827,6 +827,10 @@ class ImageJacobian(BasePytorchAlgo):
             namespace=namespace,
         )
 
+        # Scalar validation above still runs when media logging is disabled.
+        if self.logger is None:
+            return
+
         # Past this point, only rank 0 emits viz/media (no sync_dist calls).
         if dist.is_initialized() and dist.get_rank() != 0:
             return
